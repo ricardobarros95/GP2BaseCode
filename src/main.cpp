@@ -1,5 +1,6 @@
 #include "Common.h"
 #include "Graphics.h"
+#include "Vertex.h"
 
 GLfloat triangle1X = 0;
 GLfloat triangle1Y = 0;
@@ -8,6 +9,56 @@ GLfloat triangle2X = 0;
 GLfloat triangle2Y = 0;
 GLfloat triangle2Z = -5;
 
+
+Vertex verts[]{
+//Front		
+{-0.5f, 0.5f, 0.5f, 
+1.0, 0.0f, 0.0f, 1.0f},//Top Left
+{ -0.5f, -0.5, 0.5f, 
+1.0f, 1.0f, 0.0f, 1.0f }, //Bottom Left
+{0.5f, -0.5f, 0.5f,
+0.0f, 1.0f, 1.0f, 1.0f }, //Bottom Right
+{0.5f,0.5f,0.5f,
+1.0f,0.0f,1.0f,1.0f}, //Top Right
+{-0.5f,0.5f,0.5f,
+1.0f,0.0f,1.0f,1.0f}, //Top Left
+{0.5f,-0.5f,0.5f,
+0.0f,1.0f,1.0f,1.0f}, //Bottom Right
+
+//Back
+{-0.5f,0.5f,-0.5f,
+1.0f,0.0f,1.0f,1.0f},//Top Left
+
+{-0.5f,-0.5f,-0.5f,
+1.0f,1.0f,0.0f,1.0f}, //Bottom Left
+
+{0.5f, -0.5f, -0.5f,
+0.0f, 1.0f, 1.0f, 1.0f}, //Bottom Right
+
+{0.5f, 0.5f, -0.5f,
+1.0f,0.0f,1.0f,1.0f}, //Top Right
+
+{-0.5f, 0.5f, -0.5f,
+1.0f,0.0f,1.0f,1.0f}, //Top Left
+
+{0.5f, -0.5f, -0.5f,
+0.0f, 1.0f, 1.0f, 1.0f}, //Bottom Right
+
+//Left
+{-0.5f,0.5f-0.5f,
+1.0f, 1.0f, 0.0f, 1.0f},
+{-0.5f, -0.5f, -0.5f,
+0.0f,1.0f,0.0f,1.0f},
+{-0.5f,-0.5f, 0.5f},
+{-0.5f,0.5f,0.5f,
+0.0f,0.0f,1.0f,0.0f}
+
+//Right
+
+};
+
+GLuint VBO;
+
 void render()
 {
 	//Set the clear colour(background)
@@ -15,53 +66,57 @@ void render()
 	//clear the colour and depth buffer
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+	//Make VBO active
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+	glVertexPointer(3, GL_FLOAT,sizeof(Vertex), NULL);
+
+	glColorPointer(4, GL_FLOAT, sizeof(Vertex), (void**)(3 * sizeof(float)));
+
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glEnableClientState(GL_COLOR_ARRAY);
+
 	//switch to model view
 	glMatrixMode(GL_MODELVIEW);
 	//reset using the identity matrix
 	glLoadIdentity();
+
+	gluLookAt(0.0f, 0.0f, 6.0f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f);
+
+	glTranslatef(0.0f, 0.0f, -6.0f);
+
+	glDrawArrays(GL_TRIANGLES, 0, sizeof(verts) / (sizeof(Vertex)));
+
+	//glLoadIdentity();
+
+	//glTranslatef(2.0f, 0.0f, -6.0f);
+
+	//glDrawArrays(GL_TRIANGLES, 0, sizeof(verts) / (3 * sizeof(float)));
+
+
+
+
 	
-	glTranslatef(triangle1X, triangle1Y, triangle1Z);
-
-	//Begin Drawing triangles
-	glBegin(GL_TRIANGLES);
-		glColor3f(1.0f, 0.0f, 0.0f); //color of the vertices
-		glVertex3f(0.0f, 1.0f, 0.0f); // Top
-		glClearColor(1.0f, 0.0f, 0.0f, 0.5f);
-		glColor3f(0.0f, 1.0f, 0.0f);
-		glVertex3f(0.0f, -1.0f, 0.0f); //Bottom left
-		glColor3f(0.0f, 0.0f, 1.0f);
-		glVertex3f(2.0f, -1.0f, 0.0f); //Bottom Right
-	glEnd();
-
-	//reset using the identity matrix
-	glLoadIdentity();
-
-	glTranslatef(triangle2X, triangle2Y, triangle2Z);
-
-	glBegin(GL_TRIANGLES);
-		glColor3f(1.0f, 0.0f, 0.0f); //color of the vertices
-		glVertex3f(-2.0f, 1.0f, 0.0f); // Top
-		glColor3f(1.0f, 1.0f, 1.0f);
-		glVertex3f(-2.0f, -1.0f, 0.0f); //Bottom left
-		glColor3f(0.0f, 0.0f, 1.0f);
-		glVertex3f(0.0f, -1.0f, 0.0f); //Bottom Right
-	glEnd();
-
-	//glBegin(GL_QUADS);
-	//glColor3f(1.0f, 0.0f, 0.0f); //color of the vertices
-	//glVertex3f(-2.0f, 1.0f, 0.0f); // Top
-	//glColor3f(1.0f, 1.0f, 1.0f);
-	//glVertex3f(-2.0f, -1.0f, 0.0f); //Bottom left
-	//glColor3f(0.0f, 0.0f, 1.0f);
-	//glVertex3f(0.0f, -1.0f, 0.0f); //Bottom Right
-	//glColor3f(0.0f, 0.0f, 1.0f);
-	//glVertex3f(0.0f, 0.0f, 0.0f); //Bottom Right
-	//glEnd();
 }
 
 void update()
 {
 
+}
+
+void InitScene()
+{
+	//Create buffer
+	glGenBuffers(1, &VBO);
+	//Make the new VBO active
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	//Copy text data to VBO
+	glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_STATIC_DRAW);
+}
+
+void CleanUp()
+{
+	glDeleteBuffers(1, &VBO);
 }
 
 int main(int argc, char * arg[])
@@ -84,6 +139,7 @@ int main(int argc, char * arg[])
 	SDL_GLContext glcontext = SDL_GL_CreateContext(window);
 	
 	initOpenGL();
+	InitScene();
 
 	//SetViewPort
 	setViewPort(640, 480);
@@ -129,6 +185,7 @@ int main(int argc, char * arg[])
 		//Call swap so that our GL back buffer is displayed
 		SDL_GL_SwapWindow(window); //what does this do?
 	}
+	CleanUp();
 	SDL_GL_DeleteContext(glcontext);
 	SDL_DestroyWindow(window);
 	SDL_Quit(); //shouldnt this clear window as well?
