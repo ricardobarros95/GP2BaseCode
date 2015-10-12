@@ -23,35 +23,42 @@ GLfloat lookAtX = 0;
 GLfloat lookAtY = 0;
 
 GLuint EBO;
+GLuint VAO;
 
 GLuint shaderProgram = 0;
 
+//Matrices
+mat4 viewMatrix;
+mat4 projMatrix;
+mat4 worldMatrix;
+mat4 MVPMatrix;
+
 Vertex verts[]{
 //Front		
-{-0.5f, 0.5f, 0.5f, 
-1.0, 0.0f, 1.0f, 1.0f},//Top Left
+{vec3(-0.5f, 0.5f, 0.5f), 
+vec4(1.0, 0.0f, 1.0f, 1.0f)},//Top Left
 
-{ -0.5f, -0.5, 0.5f, 
-1.0f, 1.0f, 0.0f, 1.0f }, //Bottom Left
+{ vec3(-0.5f, -0.5, 0.5f), 
+vec4(1.0f, 1.0f, 0.0f, 1.0f) }, //Bottom Left
 
-{0.5f, -0.5f, 0.5f,
-0.0f, 1.0f, 1.0f, 1.0f }, //Bottom Right
+{vec3(0.5f, -0.5f, 0.5f),
+vec4(0.0f, 1.0f, 1.0f, 1.0f) }, //Bottom Right
 
-{0.5f,0.5f,0.5f,
-1.0f,0.0f,1.0f,1.0f}, //Top Right
+{vec3(0.5f,0.5f,0.5f),
+vec4(1.0f,0.0f,1.0f,1.0f)}, //Top Right
 
 //Back
-{-0.5f,0.5f,-0.5f,
-1.0f,0.0f,1.0f,1.0f},//Top Left
+{vec3(-0.5f,0.5f,-0.5f),
+vec4(1.0f,0.0f,1.0f,1.0f)},//Top Left
 
-{-0.5f,-0.5f,-0.5f,
-1.0f,1.0f,0.0f,1.0f}, //Bottom Left
+{vec3(-0.5f,-0.5f,-0.5f),
+vec4(1.0f,1.0f,0.0f,1.0f)}, //Bottom Left
 
-{0.5f, -0.5f, -0.5f,
-0.0f, 1.0f, 1.0f, 1.0f}, //Bottom Right
+{vec3(0.5f, -0.5f, -0.5f),
+vec4(0.0f, 1.0f, 1.0f, 1.0f)}, //Bottom Right
 
-{0.5f, 0.5f, -0.5f,
-1.0f,0.0f,1.0f,1.0f}, //Top Right
+{vec3(0.5f, 0.5f, -0.5f),
+vec4(1.0f,0.0f,1.0f,1.0f)}, //Top Right
 
 };
 
@@ -90,19 +97,35 @@ void render()
 	//clear the colour and depth buffer
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
+	glUseProgram(shaderProgram);
+	glBindVertexArray(VAO);
+
+	GLuint MVPLocation = glGetUniformLocation(shaderProgram, "MVP");
+	glUniformMatrix4fv(MVPLocation, 1, GL_FALSE, glm::value_ptr(MVPMatrix));
+
+
+	
 	glDrawElements(GL_TRIANGLES, sizeof(indices) / sizeof(GLuint),GL_UNSIGNED_INT,0);
+
+
 }
 
 void update()
 {
-	cubeRotationAngle += 3;
-	cubeRotationX += 1;
-	cubeRotationY += 1;
-	cubeRotationZ += 1;
+	projMatrix = perspective(45.0f, 640.0f / 480.0f, 0.1f, 100.0f);
+
+	viewMatrix = lookAt(vec3(0.0f, 0.0f, 10.0f), vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+
+	worldMatrix = translate(mat4(1.0f), vec3(0.0f, 0.0f, 0.0f));
+
+	MVPMatrix = projMatrix * viewMatrix * worldMatrix;
 }
 
 void InitScene()
 {
+	glGenVertexArrays(1, &VAO);
+	glBindVertexArray(VAO);
+	
 	//Create buffer
 	glGenBuffers(1, &VBO);
 	//Make the new VBO active
@@ -110,12 +133,18 @@ void InitScene()
 	//Copy text data to VBO
 	glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_STATIC_DRAW);
 
+
+
 	//Create buffer
 	glGenBuffers(1, &EBO);
 	//Make the new EBO active
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 	//Copy data to EBO
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+	//Tell the shader that 0 is the position element
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), NULL);
 
 	GLuint vertexShaderProgram = 0;
 	string vsPath = ASSET_PATH + SHADER_PATH + "/simpleVS.glsl";
@@ -136,6 +165,8 @@ void InitScene()
 	//now we can delete the VS and FD programs
 	glDeleteShader(vertexShaderProgram);
 	glDeleteShader(fragmentShaderProgram);
+
+	glBindAttribLocation(shaderProgram, 0, "vertexPosition");
 }
 
 void CleanUp()
@@ -143,6 +174,7 @@ void CleanUp()
 	glDeleteProgram(shaderProgram);
 	glDeleteBuffers(1, &EBO);
 	glDeleteBuffers(1, &VBO);
+	glDeleteVertexArrays(1, &VAO);
 }
 
 int main(int argc, char * arg[])
