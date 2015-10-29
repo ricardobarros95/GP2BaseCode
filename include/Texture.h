@@ -3,7 +3,9 @@
 
 #include "Common.h"
 
-GLuint  LoadTextureFromFile(const string &filename);
+GLuint LoadTextureFromFile(const string &filename);
+
+GLuint loadTextureFromFont(const string &fontFilename, int pointSize, const string &text);
 
 GLuint ConvertSDLSurfaceToTexture(SDL_Surface * surface);
 

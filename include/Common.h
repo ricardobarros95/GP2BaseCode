@@ -5,6 +5,7 @@
 #include <string>
 #include <sstream>
 #include <fstream>
+#include <vector>
 
 using namespace std;
 
@@ -12,8 +13,11 @@ using namespace std;
 #include <SDL.h>
 #include <SDL_opengl.h>
 #include <SDL_Image.h>
+#include <SDL_ttf.h>
 
 //maths headers
+
+
 #include <glm/glm.hpp>
 using namespace glm;
 
@@ -22,5 +26,8 @@ using namespace glm;
 
 const string ASSET_PATH = "assets";
 const string SHADER_PATH = "/shaders";
+const string TEXTURE_PATH = "/textures";
+const string FONT_PATH = "/fonts";
+const string MODEL_PATH = "/models";
 
 #endif

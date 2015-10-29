@@ -2,62 +2,11 @@
 #include "Graphics.h"
 #include "Vertices.h"
 #include "Shader.h"
+#include "Texture.h"
+#include "FileSystem.h"
+#include "FBXLoader.h"
+#include "Mesh.h"
 
-Vertex verts[]={
-//Front
-{ vec3(-0.5f, 0.5f, 0.5f),
-    vec4(1.0f, 0.0f, 1.0f, 1.0f), vec2(0.0f, 0.0f) },// Top Left
-
-{ vec3(-0.5f, -0.5f, 0.5f),
-    vec4(1.0f, 1.0f, 0.0f, 1.0f), vec2(0.0f,1.0f) },// Bottom Left
-
-{ vec3(0.5f, -0.5f, 0.5f),
-    vec4(0.0f, 1.0f, 1.0f, 1.0f), vec2(1.0f, 1.0f) }, //Bottom Right
-
-{ vec3(0.5f, 0.5f, 0.5f),
-    vec4(1.0f, 0.0f, 1.0f, 1.0f), vec2(1.0f, 0.0f) },// Top Right
-
-
-//back
-{ vec3(-0.5f, 0.5f, -0.5f),
-    vec4(1.0f, 0.0f, 1.0f, 1.0f), vec2(0.0f,0.0f) },// Top Left
-
-{ vec3(-0.5f, -0.5f, -0.5f),
-    vec4(1.0f, 1.0f, 0.0f, 1.0f), vec2(0.0f, 1.0f) },// Bottom Left
-
-{ vec3(0.5f, -0.5f, -0.5f),
-    vec4(0.0f, 1.0f, 1.0f, 1.0f), vec2(1.0f,1.0f) }, //Bottom Right
-
-{ vec3(0.5f, 0.5f, -0.5f),
-    vec4(1.0f, 0.0f, 1.0f, 1.0f), vec2(1.0f, 0.0f) },// Top Right
-
-};
-
-GLuint indices[]={
-    //front
-    0,1,2,
-    0,3,2,
-
-    //left
-    4,5,1,
-    4,1,0,
-
-    //right
-    3,7,2,
-    7,6,2,
-
-    //bottom
-    1,5,2,
-    6,2,5,
-
-    //top
-    4,0,7,
-    0,7,3,
-
-    //back
-    4,5,6,
-    4,7,6
-};
 
 //matrices
 mat4 viewMatrix;
@@ -69,23 +18,52 @@ GLuint VBO;
 GLuint EBO;
 GLuint VAO;
 GLuint shaderProgram;
+GLuint textureMap;
+GLuint fontTexture;
+
+MeshData currentMesh;
 
 void initScene()
 {
+	string modelPath = ASSET_PATH + MODEL_PATH + "/Tank1.fbx";
+	loadFBXFromFile(modelPath, &currentMesh);
+
+  //load texture and bind
+	string texturePath = ASSET_PATH + TEXTURE_PATH + "/Tank1DF.png";
+	textureMap = LoadTextureFromFile(texturePath);
+
+	glBindTexture(GL_TEXTURE_2D, textureMap);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+
+	string fontPath = ASSET_PATH + FONT_PATH + "/OratorStd.otf";
+	fontTexture = loadTextureFromFont(fontPath, 18, "Hello World");
+
+	glBindTexture(GL_TEXTURE_2D, fontTexture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+
+
   //Generate Vertex Array
   glGenVertexArrays(1,&VAO);
   glBindVertexArray( VAO );
   glGenBuffers(1, &VBO);
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_STATIC_DRAW);
+
+  glBufferData(GL_ARRAY_BUFFER, currentMesh.getNumVerts()*sizeof(Vertex), &currentMesh.vertices[0], GL_STATIC_DRAW);
 
   //create buffer
   glGenBuffers(1, &EBO);
   //Make the EBO active
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
   //Copy Index data to the EBO
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, currentMesh.getNumIndices()*sizeof(int), &currentMesh.indices[0], GL_STATIC_DRAW);
   //Tell the shader that 0 is the position element
   glEnableVertexAttribArray(0);
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), NULL);
@@ -97,12 +75,12 @@ void initScene()
   glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void**)(sizeof(vec3)+sizeof(vec4)));
 
   GLuint vertexShaderProgram=0;
-  string vsPath = ASSET_PATH + SHADER_PATH + "/simpleColourVS.glsl";
+  string vsPath = ASSET_PATH + SHADER_PATH + "/textureVG.glsl";
   vertexShaderProgram = loadShaderFromFile(vsPath, VERTEX_SHADER);
   checkForCompilerErrors(vertexShaderProgram);
 
   GLuint fragmentShaderProgram=0;
-  string fsPath = ASSET_PATH + SHADER_PATH + "/simpleColourFS.glsl";
+  string fsPath = ASSET_PATH + SHADER_PATH + "/TextureFS.glsl";
   fragmentShaderProgram = loadShaderFromFile(fsPath, FRAGMENT_SHADER);
   checkForCompilerErrors(fragmentShaderProgram);
 
@@ -113,6 +91,7 @@ void initScene()
   //Link attributes
   glBindAttribLocation(shaderProgram, 0, "vertexPosition");
   glBindAttribLocation(shaderProgram, 1, "vertexColour");
+  glBindAttribLocation(shaderProgram, 2, "vertexTexCoords");
 
   glLinkProgram(shaderProgram);
   checkForLinkErrors(shaderProgram);
@@ -123,17 +102,19 @@ void initScene()
 
 void cleanUp()
 {
+  glDeleteTextures(1, &textureMap);
   glDeleteProgram(shaderProgram);
   glDeleteBuffers(1, &EBO);
   glDeleteBuffers(1, &VBO);
   glDeleteVertexArrays(1,&VAO);
+  glDeleteTextures(1, &fontTexture);
 }
 
 void update()
 {
   projMatrix = glm::perspective(45.0f, 640.0f / 480.0f, 0.1f, 100.0f);
 
-  viewMatrix = glm::lookAt(vec3(0.0f, 0.0f, 10.0f), vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+  viewMatrix = glm::lookAt(vec3(5.0f, 0.0f, 5.0f), vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
 
   worldMatrix= glm::translate(mat4(1.0f), vec3(0.0f,0.0f,0.0f));
 
@@ -148,19 +129,28 @@ void render()
     //clear the colour and depth buffer
     glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glUseProgram(shaderProgram);
 
     GLint MVPLocation = glGetUniformLocation(shaderProgram, "MVP");
+
+	GLuint texture0Location = glGetUniformLocation(shaderProgram, "texture0");
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, textureMap);
+
     glUniformMatrix4fv(MVPLocation, 1, GL_FALSE, glm::value_ptr(MVPMatrix));
+	glUniform1i(texture0Location, 0);
 
     glBindVertexArray( VAO );
 
-    glDrawElements(GL_TRIANGLES, sizeof(indices)/sizeof(GLuint),GL_UNSIGNED_INT,0);
+	glDrawElements(GL_TRIANGLES, currentMesh.getNumIndices(), GL_UNSIGNED_INT, 0);
 }
 
 int main(int argc, char * arg[])
 {
-
+	ChangeWorkingDirectory();
     //Controls the game loop
     bool run=true;
 
@@ -184,6 +174,11 @@ int main(int argc, char * arg[])
 		cout << "ERROR SDL_Image Init" << IMG_GetError() << endl;
 	}
 
+	if (TTF_Init() == -1)
+	{
+		std::cout << "ERROR TTF_Init: " << TTF_GetError();
+	}
+
     //Create a window
     SDL_Window * window = SDL_CreateWindow(
                                            "SDL",             // window title
@@ -203,6 +198,7 @@ int main(int argc, char * arg[])
     setViewport(640,480);
 
     initScene();
+	GLenum err = glGetError();
     //Value to hold the event generated by SDL
     SDL_Event event;
     //Game Loop
@@ -231,10 +227,19 @@ int main(int argc, char * arg[])
                   }
             }
         }
+		err = glGetError();
+		if (err != GL_NO_ERROR)
+			printf("OGL error: %s \n", gluErrorString(err));
         //init Scene
         update();
+		err = glGetError();
+		if (err != GL_NO_ERROR)
+			printf("OGL error: %s \n", gluErrorString(err));
         //render
         render();
+		err = glGetError();
+		if (err != GL_NO_ERROR)
+			printf("OGL error: %s \n", gluErrorString(err));
         //Call swap so that our GL back buffer is displayed
         SDL_GL_SwapWindow(window);
 
@@ -245,6 +250,7 @@ int main(int argc, char * arg[])
     SDL_GL_DeleteContext(glcontext);
     SDL_DestroyWindow(window);
 	IMG_Quit();
+	TTF_Quit();
     SDL_Quit();
 
     return 0;
