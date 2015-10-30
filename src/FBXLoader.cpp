@@ -2,17 +2,16 @@
 
 int level = 0;
 
-void PrintTabs()
-{
+void PrintTabs() {
 	for (int i = 0; i < level; i++)
 		printf("\t");
 }
-//Return a string-based representation based on the attribute type
 
-FbxString GetAttributeTypeName(FbxNodeAttribute::EType type)
-{
-	switch (type)
-	{
+/**
+* Return a string-based representation based on the attribute type.
+*/
+FbxString GetAttributeTypeName(FbxNodeAttribute::EType type) {
+	switch (type) {
 	case FbxNodeAttribute::eUnknown: return "unidentified";
 	case FbxNodeAttribute::eNull: return "null";
 	case FbxNodeAttribute::eMarker: return "marker";
@@ -33,100 +32,99 @@ FbxString GetAttributeTypeName(FbxNodeAttribute::EType type)
 	case FbxNodeAttribute::eShape: return "shape";
 	case FbxNodeAttribute::eLODGroup: return "lodgroup";
 	case FbxNodeAttribute::eSubDiv: return "subdiv";
-	default: return "Unknown";
+	default: return "unknown";
 	}
 }
 
-bool loadFBXFromFile(const string &filename, MeshData *meshData)
+bool loadFBXFromFile(const string& filename, MeshData *meshData)
 {
 	level = 0;
-	//Initialize the SDK manager. This object handles memory management
-	FbxManager *ISdkManager = FbxManager::Create();
+	// Initialize the SDK manager. This object handles memory management.
+	FbxManager* lSdkManager = FbxManager::Create();
 
-	//Create the IO settings object
-	FbxIOSettings *ios = FbxIOSettings::Create(ISdkManager, IOSROOT);
-	ISdkManager->SetIOSettings(ios);
+	// Create the IO settings object.
+	FbxIOSettings *ios = FbxIOSettings::Create(lSdkManager, IOSROOT);
+	lSdkManager->SetIOSettings(ios);
 
-	//Create an importer using the SDK manager
-	FbxImporter *IImporter = FbxImporter::Create(ISdkManager, "");
+	// Create an importer using the SDK manager.
+	FbxImporter* lImporter = FbxImporter::Create(lSdkManager, "");
 
-	//Call the initialise method which will load the contents of the FBX file
-	if (!IImporter->Initialize(filename.c_str(), -1, ISdkManager->GetIOSettings()))
+	// Create a new scene so that it can be populated by the imported file.
+	if (!lImporter->Initialize(filename.c_str(), -1, lSdkManager->GetIOSettings()))
 	{
 		return false;
 	}
 
-	//Create a new scene so that it can be populated by the second imported file
-	FbxScene *IScene = FbxScene::Create(ISdkManager, "myScene");
-	//Import the contents of the file into the scene
-	IImporter->Import(IScene);
+	// Create a new scene so that it can be populated by the imported file.
+	FbxScene* lScene = FbxScene::Create(lSdkManager, "myScene");
+	// Import the contents of the file into the scene.
+	lImporter->Import(lScene);
 
-	//Process Nodes
-	FbxNode *IRootNode = IScene->GetRootNode();
-	if (IRootNode)
-	{
-		cout << "Root Node" << IRootNode->GetName() << endl;
-		for (int i = 0; i < IRootNode->GetChildCount(); i++)
+	FbxGeometryConverter IGeomConverter(lSdkManager);
+	IGeomConverter.Triangulate(lScene, /*replace*/true);
+
+	// Print the nodes of the scene and their attributes recursively.
+	// Note that we are not printing the root node because it should
+	// not contain any attributes.
+	FbxNode* lRootNode = lScene->GetRootNode();
+	if (lRootNode) {
+		cout << "Root Node " << lRootNode->GetName() << endl;
+		for (int i = 0; i < lRootNode->GetChildCount(); i++)
 		{
-			processNode(IRootNode->GetChild(i), meshData);
+			processNode(lRootNode->GetChild(i), meshData);
 		}
 	}
 
-	IImporter->Destroy();
-
+	lImporter->Destroy();
 	return true;
 }
 
 void processNode(FbxNode *node, MeshData *meshData)
 {
 	PrintTabs();
-	const char *nodeName = node->GetName();
+	const char* nodeName = node->GetName();
 	FbxDouble3 translation = node->LclTranslation.Get();
 	FbxDouble3 rotation = node->LclRotation.Get();
 	FbxDouble3 scaling = node->LclScaling.Get();
 
-	cout << "Node" << nodeName
-		<< "Position" << translation[0] << " " << translation[1] << " " << translation[2] << " "
-		<< "Rotation" << rotation[0] << " " << rotation[1] << " " << rotation[2] << " "
-		<< "Scale" << scaling[0] << " " << scaling[1] << " " << scaling[2] << endl;
+	cout << "Node " << nodeName << " Postion " << translation[0] << " " << translation[1] << " " << translation[2] << " "
+		<< " Rotation " << rotation[0] << " " << rotation[1] << " " << rotation[2] << " "
+		<< " Scale " << scaling[0] << " " << scaling[1] << " " << scaling[2] << std::endl;
 
 	level++;
-	//Print the node's attributes
-	for (int i = 0; i < node->GetNodeAttributeCount(); i++)
-	{
+	// Print the node's attributes.
+	for (int i = 0; i < node->GetNodeAttributeCount(); i++){
 		processAttribute(node->GetNodeAttributeByIndex(i), meshData);
 	}
 
-	//Recursively print the children
+	// Recursively print the children.
 	for (int j = 0; j < node->GetChildCount(); j++)
-	{
 		processNode(node->GetChild(j), meshData);
-	}
 	level--;
 	PrintTabs();
 }
 
-void processAttribute(FbxNodeAttribute *attribute, MeshData *meshData)
+void processAttribute(FbxNodeAttribute * attribute, MeshData *meshData)
 {
 	if (!attribute) return;
 	FbxString typeName = GetAttributeTypeName(attribute->GetAttributeType());
 	FbxString attrName = attribute->GetName();
 	PrintTabs();
-	cout << "Attribute" << typeName.Buffer() << "Name" << attrName << endl;
-	switch (attribute->GetAttributeType())
-	{
+	cout << "Attribute " << typeName.Buffer() << " Name " << attrName << std::endl;
+	switch (attribute->GetAttributeType()) {
 	case FbxNodeAttribute::eMesh: processMesh(attribute->GetNode()->GetMesh(), meshData);
 	case FbxNodeAttribute::eCamera: return;
 	case FbxNodeAttribute::eLight: return;
 	}
 }
 
-void processMesh(FbxMesh *mesh, MeshData *meshData)
+void processMesh(FbxMesh * mesh, MeshData *meshData)
 {
+
 	int numVerts = mesh->GetControlPointsCount();
 	int numIndices = mesh->GetPolygonVertexCount();
 
-	Vertex *pVerts = new Vertex[numVerts];
+	Vertex * pVerts = new Vertex[numVerts];
 	int *pIndices = mesh->GetPolygonVertices();
 
 	for (int i = 0; i < numVerts; i++)
@@ -138,6 +136,7 @@ void processMesh(FbxMesh *mesh, MeshData *meshData)
 	}
 
 	processMeshTextureCoords(mesh, pVerts, numVerts);
+	processMeshNormals(mesh, pVerts, numVerts);
 
 	for (int i = 0; i < numVerts; i++)
 	{
@@ -149,8 +148,6 @@ void processMesh(FbxMesh *mesh, MeshData *meshData)
 		meshData->indices.push_back(pIndices[i]);
 	}
 
-	cout << "Vertices" << numVerts << "Indices" << numIndices << endl;
-
 	if (pVerts)
 	{
 		delete[] pVerts;
@@ -158,22 +155,17 @@ void processMesh(FbxMesh *mesh, MeshData *meshData)
 	}
 }
 
-void processMeshTextureCoords(FbxMesh *mesh, Vertex *verts, int numVerts)
+void processMeshTextureCoords(FbxMesh * mesh, Vertex * verts, int numVerts)
 {
-	for (int iPolygon = 0; iPolygon < mesh->GetPolygonCount(); iPolygon++)
-	{
-		for (unsigned iPolygonVertex = 0; iPolygonVertex < 3; iPolygonVertex++)
-		{
+	for (int iPolygon = 0; iPolygon < mesh->GetPolygonCount(); iPolygon++) {
+		for (unsigned iPolygonVertex = 0; iPolygonVertex < 3; iPolygonVertex++) {
 			int fbxCornerIndex = mesh->GetPolygonVertex(iPolygon, iPolygonVertex);
 			FbxVector2 fbxUV = FbxVector2(0.0, 0.0);
-			FbxLayerElementUV * fbxLayerUV = mesh->GetLayer(0)->GetUVs();
-
-			//Get texture coordinate
-			if (fbxLayerUV)
-			{
+			FbxLayerElementUV* fbxLayerUV = mesh->GetLayer(0)->GetUVs();
+			// Get texture coordinate
+			if (fbxLayerUV) {
 				int iUVIndex = 0;
-				switch (fbxLayerUV->GetMappingMode())
-				{
+				switch (fbxLayerUV->GetMappingMode()) {
 				case FbxLayerElement::eByControlPoint:
 					iUVIndex = fbxCornerIndex;
 					break;
@@ -183,10 +175,28 @@ void processMeshTextureCoords(FbxMesh *mesh, Vertex *verts, int numVerts)
 				case FbxLayerElement::eByPolygon: iUVIndex = iPolygon;
 					break;
 				}
+	
 				fbxUV = fbxLayerUV->GetDirectArray().GetAt(iUVIndex);
 				verts[fbxCornerIndex].texCoords.x = fbxUV[0];
 				verts[fbxCornerIndex].texCoords.y = 1.0f - fbxUV[1];
 			}
+		}
+	}
+}
+
+void processMeshNormals(FbxMesh *mesh, Vertex *verts, int numVerts)
+{
+	for (int iPolygon = 0; iPolygon < mesh->GetPolygonCount(); iPolygon++)
+	{
+		for (unsigned iPolygonVertex = 0; iPolygonVertex < 3; iPolygonVertex++)
+		{
+			int fbxCornerIndex = mesh->GetPolygonVertex(iPolygon, iPolygonVertex);
+			FbxVector4 fbxNormal;
+			mesh->GetPolygonVertexNormal(iPolygon, iPolygonVertex, fbxNormal);
+			fbxNormal.Normalize();
+			verts[fbxCornerIndex].normal.x = fbxNormal[0];
+			verts[fbxCornerIndex].normal.y = fbxNormal[1];
+			verts[fbxCornerIndex].normal.z = fbxNormal[2];
 		}
 	}
 }

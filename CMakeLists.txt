@@ -20,13 +20,20 @@ add_executable(GP2BaseCode src/main.cpp
 							src/FBXLoader.cpp 
 							include/Common.h 
 							include/Graphics.h 
+							include/Vertices.h
 							include/Shader.h 
 							include/Texture.h 
 							include/FileSystem.h 
 							include/Mesh.h
 							include/FBXLoader.h
 							assets/shaders/TextureFS.glsl 
-							assets/shaders/textureVG.glsl)
+							assets/shaders/textureVG.glsl
+							assets/shaders/ambientVS.glsl
+							assets/shaders/ambientFS.glsl
+							assets/shaders/diffuseVS.glsl
+							assets/shaders/diffuseFS.glsl
+							assets/shaders/specularVS.glsl
+							assets/shaders/specularFS.glsl)
 
 include_directories(GP2BaseCode include/ 
 							${OPENGL_INCLUDE_DIRS} 

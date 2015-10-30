@@ -12,7 +12,7 @@
 mat4 viewMatrix;
 mat4 projMatrix;
 mat4 worldMatrix;
-mat4 MVPMatrix;
+
 
 GLuint VBO;
 GLuint EBO;
@@ -23,9 +23,24 @@ GLuint fontTexture;
 
 MeshData currentMesh;
 
+
+
+//Shader Variables
+mat4 MVPMatrix;
+mat4 modelMatrix;
+vec3 lightDirection = vec3(0.0f, 0.0f, 1.0f);
+vec4 ambientMaterialColor = vec4(0.3f, 0.3f, 0.3f, 1.0f);
+vec4 ambientLightColor = vec4(1.0f, 1.0f, 1.0f, 1.0f);
+vec4 diffuseMaterialColor = vec4(0.3f, 0.3f, 0.3f, 1.0f);
+vec4 diffuseLightColor = vec4(1.0f, 1.0f, 1.0f, 1.0f);
+vec3 cameraPosition = vec3(5.0f, 35.0f, 50.0f);
+vec4 specularMaterialColor = vec4(0.3f, 0.3f, 0.3f, 1.0f);
+GLfloat specularPower = 100;
+vec4 specularLightColor = vec4(1.0f, 1.0f, 1.0f, 1.0f);
+
 void initScene()
 {
-	string modelPath = ASSET_PATH + MODEL_PATH + "/Tank1.fbx";
+	string modelPath = ASSET_PATH + MODEL_PATH + "/Utah-Teapot.fbx";
 	loadFBXFromFile(modelPath, &currentMesh);
 
   //load texture and bind
@@ -74,13 +89,16 @@ void initScene()
   glEnableVertexAttribArray(2);
   glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void**)(sizeof(vec3)+sizeof(vec4)));
 
+  glEnableVertexAttribArray(3);
+  glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void**)(sizeof(vec3) + sizeof(vec4) + sizeof(vec2)));
+
   GLuint vertexShaderProgram=0;
-  string vsPath = ASSET_PATH + SHADER_PATH + "/textureVG.glsl";
+  string vsPath = ASSET_PATH + SHADER_PATH + "/specularVS.glsl";
   vertexShaderProgram = loadShaderFromFile(vsPath, VERTEX_SHADER);
   checkForCompilerErrors(vertexShaderProgram);
 
   GLuint fragmentShaderProgram=0;
-  string fsPath = ASSET_PATH + SHADER_PATH + "/TextureFS.glsl";
+  string fsPath = ASSET_PATH + SHADER_PATH + "/specularFS.glsl";
   fragmentShaderProgram = loadShaderFromFile(fsPath, FRAGMENT_SHADER);
   checkForCompilerErrors(fragmentShaderProgram);
 
@@ -92,6 +110,7 @@ void initScene()
   glBindAttribLocation(shaderProgram, 0, "vertexPosition");
   glBindAttribLocation(shaderProgram, 1, "vertexColour");
   glBindAttribLocation(shaderProgram, 2, "vertexTexCoords");
+  glBindAttribLocation(shaderProgram, 3, "vertexNormal");
 
   glLinkProgram(shaderProgram);
   checkForLinkErrors(shaderProgram);
@@ -114,7 +133,7 @@ void update()
 {
   projMatrix = glm::perspective(45.0f, 640.0f / 480.0f, 0.1f, 100.0f);
 
-  viewMatrix = glm::lookAt(vec3(5.0f, 0.0f, 5.0f), vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+  viewMatrix = glm::lookAt(cameraPosition, vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
 
   worldMatrix= glm::translate(mat4(1.0f), vec3(0.0f,0.0f,0.0f));
 
@@ -133,15 +152,42 @@ void render()
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glUseProgram(shaderProgram);
 
-    GLint MVPLocation = glGetUniformLocation(shaderProgram, "MVP");
+    GLuint MVPLocation = glGetUniformLocation(shaderProgram, "MVP");
 
 	GLuint texture0Location = glGetUniformLocation(shaderProgram, "texture0");
+
+	GLuint ambMatColorLocation = glGetUniformLocation(shaderProgram, "ambientMaterialColour");
+
+	GLuint ambLightColorLocation = glGetUniformLocation(shaderProgram, "ambientLightColour");
+
+	GLuint modelLocation = glGetUniformLocation(shaderProgram, "Model");
+
+	GLuint lightDirectionLocation = glGetUniformLocation(shaderProgram, "lightDirection");
+
+	GLuint diffMatColorLocation = glGetUniformLocation(shaderProgram, "diffuseMaterialColour");
+
+	GLuint diffLightColorLocation = glGetUniformLocation(shaderProgram, "diffuseLightColour");
+
+	GLuint specMatColorLocation = glGetUniformLocation(shaderProgram, "specularMaterialColour");
+
+	GLuint specPowerLocation = glGetUniformLocation(shaderProgram, "specularPower");
+
+	GLuint specLightColorLocation = glGetUniformLocation(shaderProgram, "specularLightColour");
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, textureMap);
 
     glUniformMatrix4fv(MVPLocation, 1, GL_FALSE, glm::value_ptr(MVPMatrix));
 	glUniform1i(texture0Location, 0);
+	glUniform4fv(ambMatColorLocation, 1, glm::value_ptr(ambientMaterialColor));
+	glUniform4fv(ambLightColorLocation, 1, glm::value_ptr(ambientLightColor));
+	glUniformMatrix4fv(modelLocation, 1, GL_FALSE, glm::value_ptr(modelMatrix));
+	glUniform3fv(lightDirectionLocation, 1, glm::value_ptr(lightDirection));
+	glUniform4fv(diffLightColorLocation, 1, glm::value_ptr(diffuseLightColor));
+	glUniform4fv(diffMatColorLocation, 1, glm::value_ptr(diffuseMaterialColor));
+	glUniform4fv(specMatColorLocation, 1, glm::value_ptr(specularMaterialColor));
+	glUniform1f(specPowerLocation, specularPower);
+	glUniform4fv(specLightColorLocation, 1, glm::value_ptr(specularLightColor));
 
     glBindVertexArray( VAO );
 
