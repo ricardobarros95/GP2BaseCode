@@ -20,6 +20,15 @@ GLuint VAO;
 GLuint shaderProgram;
 GLuint textureMap;
 GLuint fontTexture;
+GLuint FBOTexture;
+GLuint FBODepthBuffer;
+GLuint frameBufferObject;
+GLuint fullScreenVAO;
+GLuint fullScreenVBO;
+GLuint fullScreenShaderProgram;
+
+const int FRAME_BUFFER_WIDTH = 640;
+const int FRAME_BUFFER_HEIGHT = 480;
 
 MeshData currentMesh;
 
@@ -33,13 +42,96 @@ vec4 ambientMaterialColor = vec4(0.3f, 0.3f, 0.3f, 1.0f);
 vec4 ambientLightColor = vec4(1.0f, 1.0f, 1.0f, 1.0f);
 vec4 diffuseMaterialColor = vec4(0.3f, 0.3f, 0.3f, 1.0f);
 vec4 diffuseLightColor = vec4(1.0f, 1.0f, 1.0f, 1.0f);
-vec3 cameraPosition = vec3(5.0f, 35.0f, 50.0f);
+vec3 cameraPosition = vec3(15.0f, 50.0f, 50.0f);
 vec4 specularMaterialColor = vec4(0.3f, 0.3f, 0.3f, 1.0f);
 GLfloat specularPower = 100;
 vec4 specularLightColor = vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
+//Quad Coords
+float vertices[] =
+{
+	-1, -1,
+	1, -1,
+	-1, 1,
+	1, 1,
+};
+void CreateFrameBuffer()
+{
+	//Create Texture Object
+	glActiveTexture(GL_TEXTURE0);
+	glGenTextures(1, &FBOTexture);
+	glBindTexture(GL_TEXTURE_2D, FBOTexture);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT,
+		0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+
+	//Create Depth Buffer
+	glGenRenderbuffers(1, &FBODepthBuffer);
+	glBindRenderbuffer(GL_RENDERBUFFER, FBODepthBuffer);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32, FRAME_BUFFER_WIDTH,
+		FRAME_BUFFER_HEIGHT);
+	glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+	//Create Framebuffer
+	glGenFramebuffers(1, &frameBufferObject);
+	glBindFramebuffer(GL_FRAMEBUFFER, frameBufferObject);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+		FBOTexture, 0);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER,
+		FBODepthBuffer);
+
+	//Check Status of the buffer
+	GLenum status;
+	if ((status = glCheckFramebufferStatus(
+		GL_FRAMEBUFFER)) !=
+		GL_FRAMEBUFFER_COMPLETE)	{
+		cout << "Issue	with	Framebuffers" << endl;
+	}
+}
 void initScene()
 {
+	CreateFrameBuffer();
+	//Generate and bind Vertex Array Object
+	glGenVertexArrays(1, &fullScreenVAO);
+	glBindVertexArray(fullScreenVAO);
+	//Generate, beinf and fill Vertex Buffer Object
+	glGenBuffers(1, &fullScreenVBO);
+	glBindBuffer(GL_ARRAY_BUFFER, fullScreenVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	//Enable Vertex Attibute Array and define Attribute Pointer
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, NULL);
+
+	//Load and Compile simplePostProcessVS.glsl
+	GLuint postProcessVertexShaderProgram = 0;
+	string postProcessVSPath = ASSET_PATH + SHADER_PATH + "/simplePostProcessVS.glsl";
+	postProcessVertexShaderProgram = loadShaderFromFile(postProcessVSPath, VERTEX_SHADER);
+	checkForCompilerErrors(postProcessVertexShaderProgram);
+
+	//Load and Compile simplePostProcessFS.glsl
+	GLuint postProcessFragmentShaderProgram = 0;
+	string postProcessFSPath = ASSET_PATH + SHADER_PATH + "/simplePostProcessFS.glsl";
+	postProcessFragmentShaderProgram = loadShaderFromFile(postProcessFSPath, FRAGMENT_SHADER);
+	checkForCompilerErrors(postProcessFragmentShaderProgram);
+
+	//Create and link fullScreenShaderProgram
+	fullScreenShaderProgram = glCreateProgram();
+	glAttachShader(fullScreenShaderProgram, postProcessVertexShaderProgram);
+	glAttachShader(fullScreenShaderProgram, postProcessFragmentShaderProgram);
+	glBindAttribLocation(0, fullScreenShaderProgram, "vertexPosition");
+	glLinkProgram(fullScreenShaderProgram);
+	checkForLinkErrors(fullScreenShaderProgram);
+
+	glDeleteShader(postProcessVertexShaderProgram);
+	glDeleteShader(postProcessFragmentShaderProgram);
+
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
 	string modelPath = ASSET_PATH + MODEL_PATH + "/Utah-Teapot.fbx";
 	loadFBXFromFile(modelPath, &currentMesh);
 
@@ -119,40 +211,21 @@ void initScene()
   glDeleteShader(fragmentShaderProgram);
 }
 
-void cleanUp()
+void RenderScene()
 {
-  glDeleteTextures(1, &textureMap);
-  glDeleteProgram(shaderProgram);
-  glDeleteBuffers(1, &EBO);
-  glDeleteBuffers(1, &VBO);
-  glDeleteVertexArrays(1,&VAO);
-  glDeleteTextures(1, &fontTexture);
-}
+	glBindFramebuffer(GL_FRAMEBUFFER, frameBufferObject);
 
-void update()
-{
-  projMatrix = glm::perspective(45.0f, 640.0f / 480.0f, 0.1f, 100.0f);
+	//old imediate mode!
+	//Set the clear colour(background)
+	glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
+	//clear the colour and depth buffer
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-  viewMatrix = glm::lookAt(cameraPosition, vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+	//glEnable(GL_BLEND);
+	//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glUseProgram(shaderProgram);
 
-  worldMatrix= glm::translate(mat4(1.0f), vec3(0.0f,0.0f,0.0f));
-
-  MVPMatrix=projMatrix*viewMatrix*worldMatrix;
-}
-
-void render()
-{
-    //old imediate mode!
-    //Set the clear colour(background)
-    glClearColor( 0.0f, 0.0f, 0.0f, 0.0f );
-    //clear the colour and depth buffer
-    glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
-
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glUseProgram(shaderProgram);
-
-    GLuint MVPLocation = glGetUniformLocation(shaderProgram, "MVP");
+	GLuint MVPLocation = glGetUniformLocation(shaderProgram, "MVP");
 
 	GLuint texture0Location = glGetUniformLocation(shaderProgram, "texture0");
 
@@ -177,7 +250,7 @@ void render()
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, textureMap);
 
-    glUniformMatrix4fv(MVPLocation, 1, GL_FALSE, glm::value_ptr(MVPMatrix));
+	glUniformMatrix4fv(MVPLocation, 1, GL_FALSE, glm::value_ptr(MVPMatrix));
 	glUniform1i(texture0Location, 0);
 	glUniform4fv(ambMatColorLocation, 1, glm::value_ptr(ambientMaterialColor));
 	glUniform4fv(ambLightColorLocation, 1, glm::value_ptr(ambientLightColor));
@@ -189,10 +262,72 @@ void render()
 	glUniform1f(specPowerLocation, specularPower);
 	glUniform4fv(specLightColorLocation, 1, glm::value_ptr(specularLightColor));
 
-    glBindVertexArray( VAO );
+	glBindVertexArray(VAO);
 
 	glDrawElements(GL_TRIANGLES, currentMesh.getNumIndices(), GL_UNSIGNED_INT, 0);
+
 }
+
+void RenderPostProcessing()
+{
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT || GL_DEPTH_BUFFER_BIT);
+	glUseProgram(fullScreenShaderProgram);
+
+	GLuint texture0location = glGetUniformLocation(fullScreenShaderProgram, "texture0");
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, FBOTexture);
+	glUniform1i(texture0location, 0);
+
+	glBindVertexArray(fullScreenVAO);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+
+}
+
+void CleanUpFrameBuffer()
+{
+	glDeleteTextures(1, &FBOTexture);
+	glDeleteBuffers(1, &FBODepthBuffer);
+	glDeleteBuffers(1, &frameBufferObject);
+	glDeleteBuffers(1, &fullScreenVAO);
+	glDeleteBuffers(1, &fullScreenVBO);
+	glDeleteProgram(fullScreenShaderProgram);
+}
+
+void cleanUp()
+{
+  CleanUpFrameBuffer();
+  glDeleteTextures(1, &textureMap);
+  glDeleteProgram(shaderProgram);
+  glDeleteBuffers(1, &EBO);
+  glDeleteBuffers(1, &VBO);
+  glDeleteVertexArrays(1,&VAO);
+  glDeleteTextures(1, &fontTexture);
+}
+
+void update()
+{
+  projMatrix = glm::perspective(45.0f, 640.0f / 480.0f, 0.1f, 100.0f);
+
+  viewMatrix = glm::lookAt(cameraPosition, vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+
+  worldMatrix= glm::translate(mat4(1.0f), vec3(0.0f,0.0f,0.0f));
+
+  MVPMatrix=projMatrix*viewMatrix*worldMatrix;
+
+ // modelMatrix = modelMatrix * mat4(0.1f);
+}
+
+void render()
+{
+	RenderScene();
+	RenderPostProcessing();
+}
+
+
 
 int main(int argc, char * arg[])
 {
@@ -274,18 +409,18 @@ int main(int argc, char * arg[])
             }
         }
 		err = glGetError();
-		if (err != GL_NO_ERROR)
-			printf("OGL error: %s \n", gluErrorString(err));
+		//if (err != GL_NO_ERROR)
+		//	printf("OGL error: %s \n", gluErrorString(err));
         //init Scene
         update();
-		err = glGetError();
-		if (err != GL_NO_ERROR)
-			printf("OGL error: %s \n", gluErrorString(err));
-        //render
-        render();
-		err = glGetError();
-		if (err != GL_NO_ERROR)
-			printf("OGL error: %s \n", gluErrorString(err));
+		//err = glGetError();
+		//if (err != GL_NO_ERROR)
+		//	printf("OGL error: %s \n", gluErrorString(err));
+  //      //render
+		render();
+		//err = glGetError();
+		//if (err != GL_NO_ERROR)
+		//	printf("OGL error: %s \n", gluErrorString(err));
         //Call swap so that our GL back buffer is displayed
         SDL_GL_SwapWindow(window);
 

@@ -143,9 +143,10 @@ void processMesh(FbxMesh * mesh, MeshData *meshData)
 		meshData->vertices.push_back(pVerts[i]);
 	}
 
+	int offset = meshData->indices.size();
 	for (int i = 0; i < numIndices; i++)
 	{
-		meshData->indices.push_back(pIndices[i]);
+		meshData->indices.push_back(offset + pIndices[i]);
 	}
 
 	if (pVerts)

@@ -33,7 +33,9 @@ add_executable(GP2BaseCode src/main.cpp
 							assets/shaders/diffuseVS.glsl
 							assets/shaders/diffuseFS.glsl
 							assets/shaders/specularVS.glsl
-							assets/shaders/specularFS.glsl)
+							assets/shaders/specularFS.glsl
+							assets/shaders/simplePostProcessVS.glsl
+							assets/shaders/simplePostProcessFS.glsl)
 
 include_directories(GP2BaseCode include/ 
 							${OPENGL_INCLUDE_DIRS} 
