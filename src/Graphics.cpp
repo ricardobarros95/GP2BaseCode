@@ -52,7 +52,7 @@ void initOpenGL()
     glDepthFunc( GL_LEQUAL );
 
     //Turn on best perspective correction
-    glHint( GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST );
+   // glHint( GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST );
 }
 
 //Function to set/reset viewport
