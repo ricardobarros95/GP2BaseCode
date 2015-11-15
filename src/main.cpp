@@ -115,234 +115,9 @@ void CreateFrameBuffer()
 	}
 }
 
-void CreateFrameBufferDepth()
-{
-	//Create framebuffer
-	glGenFramebuffers(1, &FBO);
-	glBindFramebuffer(GL_FRAMEBUFFER_EXT, FBO);
-
-	//Depth Texture
-	glGenTextures(1, &depthTexture);
-	glBindTexture(GL_TEXTURE_2D, depthTexture);
-	
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 1024, 1024, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, 0);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	glBindFramebuffer(GL_FRAMEBUFFER, FBO);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture, 0);
-
-	//We dont want to draw any color
-	glDrawBuffer(GL_NONE);
-	glReadBuffer(GL_NONE);
-
-	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_TEXTURE_2D, depthTexture, 0);
-
-
-	//Check Status of the buffer
-	GLenum status;
-	if ((status = glCheckFramebufferStatus(
-		GL_FRAMEBUFFER)) !=
-		GL_FRAMEBUFFER_COMPLETE)	{
-		cout << "Issue	with	Framebuffers" << endl;
-	}
-
-	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
-}
-
-void MVPLightPoV()
-{
-	GLfloat nearPlane = 1.0f;
-	GLfloat farPlane = 7.5f;
-
-	mat4 lightProjection = ortho<float>(-10, 10, -10, 10, nearPlane, farPlane);
-	mat4 lightView = lookAt(vec3(-2.0f, 4.0f, -1.0f), vec3(0, 0, 0), vec3(1.0f));
-	lightSpaceMatrix = lightProjection * lightView;
-
-}
-
-void setTextureMatrix(void)
-{
-	static double modelView[16];
-	static double projection[16];
-
-	// Moving from unit cube [-1,1] to [0,1]  
-	const GLdouble bias[16] = {
-		0.5, 0.0, 0.0, 0.0,
-		0.0, 0.5, 0.0, 0.0,
-		0.0, 0.0, 0.5, 0.0,
-		0.5, 0.5, 0.5, 1.0 };
-
-	// Grab modelview and transformation matrices
-	glGetDoublev(GL_MODELVIEW_MATRIX, modelView);
-	glGetDoublev(GL_PROJECTION_MATRIX, projection);
-
-
-	glMatrixMode(GL_TEXTURE);
-	glActiveTextureARB(GL_TEXTURE7);
-
-	glLoadIdentity();
-	glLoadMatrixd(bias);
-
-	// concatating all matrices into one.
-	glMultMatrixd(projection);
-	glMultMatrixd(modelView);
-
-	// Go back to normal matrix mode
-	glMatrixMode(GL_MODELVIEW);
-}
-
-void setupMatrices(float position_x, float position_y, float position_z, float lookAt_x, float lookAt_y, float lookAt_z)
-{
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	gluPerspective(45, RENDER_WIDTH / RENDER_HEIGHT, 10, 40000);
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-	gluLookAt(position_x, position_y, position_z, lookAt_x, lookAt_y, lookAt_z, 0, 1, 0);
-}
-
-void Update(void)
-{
-	lightPos.x = lightMovementRadius * cos(ftime);
-	lightPos.z = lightMovementRadius * sin(ftime);
-}
-
-void startTranslate(float x, float y, float z)
-{
-	glPushMatrix();
-	glTranslatef(x, y, z);
-
-	glMatrixMode(GL_TEXTURE);
-	glActiveTextureARB(GL_TEXTURE7);
-	glPushMatrix();
-	glTranslatef(x, y, z);
-}
-
-void endTranslate()
-{
-	glPopMatrix();
-	glMatrixMode(GL_MODELVIEW);
-	glPopMatrix();
-}
-
-void drawObjects(void)
-{
-	// Ground
-	glColor4f(0.3f, 0.3f, 0.3f, 1);
-	glBegin(GL_QUADS);
-	glVertex3f(-35, 2, -35);
-	glVertex3f(-35, 2, 15);
-	glVertex3f(15, 2, 15);
-	glVertex3f(15, 2, -35);
-	glEnd();
-
-	glColor4f(0.9f, 0.9f, 0.9f, 1);
-}
-
-void renderScene(void)
-{
-	Update();
-
-	//First step: Render from the light POV to a FBO, story depth values only
-	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, FBO);	//Rendering offscreen
-
-	//Using the fixed pipeline to render to the depthbuffer
-	glUseProgramObjectARB(0);
-
-	// In the case we render the shadowmap to a higher resolution, the viewport must be modified accordingly.
-	glViewport(0, 0, RENDER_WIDTH * SHADOW_MAP_RATIO, RENDER_HEIGHT* SHADOW_MAP_RATIO);
-
-	// Clear previous frame values
-	glClear(GL_DEPTH_BUFFER_BIT);
-
-	//Disable color rendering, we only want to write to the Z-Buffer
-	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-
-	setupMatrices(lightPos.x, lightPos.y, lightPos.z, lightLookAt.x, lightLookAt.y, lightLookAt.z);
-
-	// Culling switching, rendering only backface, this is done to avoid self-shadowing
-	glCullFace(GL_FRONT);
-	drawObjects();
-
-	//Save modelview/projection matrice into texture7, also add a biais
-	setTextureMatrix();
-
-
-	// Now rendering from the camera POV, using the FBO to generate shadows
-	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
-
-	glViewport(0, 0, RENDER_WIDTH, RENDER_HEIGHT);
-
-	//Enabling color write (previously disabled for light POV z-buffer rendering)
-	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-
-	// Clear previous frame values
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	//Using the shadow shader
-	glUseProgramObjectARB(shadowShaderId);
-	glUniform1iARB(shadowMapUniform, 7);
-	glActiveTextureARB(GL_TEXTURE7);
-	glBindTexture(GL_TEXTURE_2D, depthTexture);
 
 
 
-
-
-
-	setupMatrices(cameraPos.x, cameraPos.y, cameraPos.z, cameraLookAt.x, cameraLookAt.y, cameraLookAt.z);
-
-	glCullFace(GL_BACK);
-	drawObjects();
-
-	// DEBUG only. this piece of code draw the depth buffer onscreen
-	/*
-	glUseProgramObjectARB(0);
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	glOrtho(-RENDER_WIDTH/2,RENDER_WIDTH/2,-RENDER_HEIGHT/2,RENDER_HEIGHT/2,1,20);
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-	glColor4f(1,1,1,1);
-	glActiveTextureARB(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D,depthTextureId);
-	glEnable(GL_TEXTURE_2D);
-	glTranslated(0,0,-1);
-	glBegin(GL_QUADS);
-	glTexCoord2d(0,0);glVertex3f(0,0,0);
-	glTexCoord2d(1,0);glVertex3f(RENDER_WIDTH/2,0,0);
-	glTexCoord2d(1,1);glVertex3f(RENDER_WIDTH/2,RENDER_HEIGHT/2,0);
-	glTexCoord2d(0,1);glVertex3f(0,RENDER_HEIGHT/2,0);
-
-
-	glEnd();
-	glDisable(GL_TEXTURE_2D);
-	*/
-
-}
-
-
-//void RenderShadowMapScene()
-//{
-//	glBindFramebuffer(GL_FRAMEBUFFER, FBO);
-//	glViewport(0, 0, 1024, 1024);
-//
-//	glUseProgram(shadowMapProgram);
-//
-//	GLuint depthMVPLocation = glGetUniformLocation(shadowMapProgram, "depthMVP");
-//
-//	
-//
-//	glActiveTexture(GL_TEXTURE0);
-//	glBindTexture(GL_TEXTURE_2D, depthTexture);
-//	glUniformMatrix4fv(depthMVPLocation, 1, GL_FALSE, &depthMVP[0][0]);
-//
-//}
 
 void initScene()
 {
@@ -382,36 +157,7 @@ void initScene()
 	glDeleteShader(postProcessVertexShaderProgram);
 	glDeleteShader(postProcessFragmentShaderProgram);
 
-	/****************************************
-	ShadowMap Shader Begin
-	*****************************************/
 
-	//Load and Compile shadowMapVS.glsl
-	GLuint shadowMapVertexShaderProgram = 0;
-	string shadowMapVSPath = ASSET_PATH + SHADER_PATH + "/shadowMapVS.glsl";
-	shadowMapVertexShaderProgram = loadShaderFromFile(shadowMapVSPath, VERTEX_SHADER);
-	checkForCompilerErrors(shadowMapVertexShaderProgram);
-
-	//Load and Compile shadowMapFS.glsl
-	GLuint shadowMapFragmentShaderProgram = 0;
-	string shadowMapFSPath = ASSET_PATH + SHADER_PATH + "/shadowMapFS.glsl";
-	shadowMapFragmentShaderProgram = loadShaderFromFile(shadowMapFSPath, FRAGMENT_SHADER);
-	checkForCompilerErrors(shadowMapFragmentShaderProgram);
-
-	//Create and link shadowMapProgram
-	shadowMapProgram = glCreateProgram();
-	glAttachShader(shadowMapProgram, shadowMapVertexShaderProgram);
-	glAttachShader(shadowMapProgram, shadowMapFragmentShaderProgram);
-	glBindAttribLocation(0, shadowMapProgram, "depthMVP");
-	glLinkProgram(shadowMapProgram);
-	checkForLinkErrors(shadowMapProgram);
-
-	glDeleteShader(shadowMapVertexShaderProgram);
-	glDeleteShader(shadowMapFragmentShaderProgram);
-
-	/****************************************
-	ShadowMap Shader End
-	*****************************************/
 
 	glBindVertexArray(0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -507,12 +253,7 @@ void RenderScene()
 
 	//glEnable(GL_BLEND);
 	//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	//glUseProgram(shaderProgram);
-	glUseProgram(shadowMapProgram);
-
-	GLuint shadowLocation = glGetUniformLocation(shadowMapProgram, "lightSpaceMatrix");
-	glUniformMatrix4fv(shadowLocation, 1, GL_FALSE, value_ptr(lightSpaceMatrix));
-	glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+	glUseProgram(shaderProgram);
 	glBindFramebuffer(GL_FRAMEBUFFER, FBO);
 	glClear(GL_DEPTH_BUFFER_BIT);
 	
@@ -611,54 +352,15 @@ void update()
   MVPMatrix=projMatrix*viewMatrix*worldMatrix;
 
  // modelMatrix = modelMatrix * mat4(0.1f);
-  MVPLightPoV();
+
 }
 
 void render()
 {
-	//Render to Depth texture
-	glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
-	glBindFramebuffer(GL_FRAMEBUFFER, FBO);
-		glClear(GL_DEPTH_BUFFER_BIT);
-		MVPLightPoV();
-		RenderScene();
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	//Render scene has normal with shadow mapping
-	glViewport(0, 0, 640, 480);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	MVPLightPoV();
-	glBindTexture(GL_TEXTURE_2D, depthTexture);
 	RenderScene();
 	RenderPostProcessing();
 }
 
-void LoadShadowShader()
-{
-	//Load and Compile shadowMapVS.glsl
-	GLuint shadowMapVertexShaderProgram = 0;
-	string shadowMapVSPath = ASSET_PATH + SHADER_PATH + "/shadowMapVS.glsl";
-	shadowMapVertexShaderProgram = loadShaderFromFile(shadowMapVSPath, VERTEX_SHADER);
-	checkForCompilerErrors(shadowMapVertexShaderProgram);
-
-	//Load and Compile shadowMapFS.glsl
-	GLuint shadowMapFragmentShaderProgram = 0;
-	string shadowMapFSPath = ASSET_PATH + SHADER_PATH + "/shadowMapFS.glsl";
-	shadowMapFragmentShaderProgram = loadShaderFromFile(shadowMapFSPath, FRAGMENT_SHADER);
-	checkForCompilerErrors(shadowMapFragmentShaderProgram);
-
-	//Create and link shadowMapProgram
-	shadowShaderId = glCreateProgram();
-	glAttachShader(shadowShaderId, shadowMapVertexShaderProgram);
-	glAttachShader(shadowShaderId, shadowMapFragmentShaderProgram);
-	glBindAttribLocation(0, shadowShaderId, "ShadowMap");
-	glLinkProgram(shadowShaderId);
-	checkForLinkErrors(shadowShaderId);
-
-	shadowMapUniform = glGetUniformLocation(shadowShaderId, "ShadowMap");
-
-	glDeleteShader(shadowMapVertexShaderProgram);
-	glDeleteShader(shadowMapFragmentShaderProgram);
-}
 
 int main(int argc, char * arg[])
 {
@@ -726,14 +428,7 @@ int main(int argc, char * arg[])
 		totalTime += ftime;
         //While we still have events in the queue
 
-		CreateFrameBufferDepth();
-		LoadShadowShader();
-		glEnable(GL_DEPTH_TEST);
-		glClearColor(0, 0, 0, 1.0f);
 
-		glEnable(GL_CULL_FACE);
-
-		glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
 
 
         while (SDL_PollEvent(&event)) {
@@ -763,12 +458,11 @@ int main(int argc, char * arg[])
 		//	printf("OGL error: %s \n", gluErrorString(err));
         //init Scene
         //update();
-		renderScene();
 		//err = glGetError();
 		//if (err != GL_NO_ERROR)
 		//	printf("OGL error: %s \n", gluErrorString(err));
   //      //render
-		//render();
+		render();
 		//err = glGetError();
 		//if (err != GL_NO_ERROR)
 		//	printf("OGL error: %s \n", gluErrorString(err));
